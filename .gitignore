@@ -1,0 +1,8 @@
+!.gitignore
+
+*.o
+/ffosm
+/ffosm.db
+/a.out
+
+
