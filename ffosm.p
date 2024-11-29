@@ -1,5 +1,7 @@
+<!DOCTYPE html>
 <html>
  <head>
+  <meta charset="utf-8">
   <style>
    th, td { text-align: center; vertical-align: middle; }
   </style>

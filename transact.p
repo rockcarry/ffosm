@@ -1,5 +1,7 @@
+<!DOCTYPE html>
 <html>
  <head>
+  <meta charset="utf-8">
   <title>ffosm 办公物品管理系统 v1.0.0</title>
  </head>
  <body>
@@ -11,7 +13,7 @@
     <tr><td>%s</td><td>%s</td></tr>
     <tr><td>交易用户：</td><td><input type="text" name="user" value="%s"/></td></tr>
     <tr><td>交易数量：</td><td><input type="text" name="quantity" value="%s"/></td></tr>
-    <tr><td>交易备注：</td><td><input type="text" name="remark"/></td></tr>
+    <tr><td>交易备注：</td><td><input type="text" name="remarks"/></td></tr>
    </table>
    <br>
    <input type="hidden" name="submit" value="1"/>
