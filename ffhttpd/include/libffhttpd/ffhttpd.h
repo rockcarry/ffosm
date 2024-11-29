@@ -46,8 +46,9 @@ long ffhttpd_set (void *ctx, char *name, void *param);
 long ffhttpd_get (void *ctx, char *name, void *param);
 void ffhttpd_dump(void *ctx, char *str, int len, int page);
 
-#define FFHTTPD_PARAM_DIGESTAUTH "s_digestauth" // set/get, "" - means disable authentication, "/xxx" - match the path prefix, enable authentication for match path
-#define FFHTTPD_PARAM_PASSWORDCB "i_passwordcb" // set, user password callback for digest authentication
+#define FFHTTPD_PARAM_DIGESTAUTH  "s_digestauth"  // set/get, "" - means disable authentication, "/xxx" - match the path prefix, enable authentication for match path
+#define FFHTTPD_PARAM_PASSWORDCB  "i_passwordcb"  // set, user password callback for digest authentication
+#define FFHTTPD_PARAM_RESPBUFSIZE "i_respbufsize" // set/get, response buffer size
 
 // howto enable & implement ffhttpd server digest authentication ? see example code:
 #if 0
