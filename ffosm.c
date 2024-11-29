@@ -130,23 +130,23 @@ int ffosm_query_stock(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, char *nam
     if (!ctx) return -1;
     sqlite3 *db  = ctx;
     char    *err = NULL;
-    char     sql[256];
-    int      rc;
+    char     sql[512];
+    char    *str = sql;
+    int      len = sizeof(sql);
+    int      ret, rc;
     callback = callback ? callback : callback_query_stock;
-    strncpy(sql, "SELECT Id, ItemName, Quantity, Price, Remarks FROM StockTab WHERE TRUE", sizeof(sql) - 1);
+    ret = snprintf(str, len, "SELECT Id, ItemName, Quantity, Price, Remarks FROM StockTab WHERE TRUE");
+    str += ret, len -= ret;
     if (name && strcmp(name, "") != 0 && strcmp(name, "*") != 0) {
-        strncat(sql, " AND "       , sizeof(sql) - 1);
-        strncat(sql, "ItemName = '", sizeof(sql) - 1);
-        strncat(sql, name          , sizeof(sql) - 1);
-        strncat(sql, "'"           , sizeof(sql) - 1);
+        ret = snprintf(str, len, " AND ItemName LIKE '%%%s%%'", name);
+        str += ret, len -= ret;
     }
     if (remarks && strcmp(remarks, "") != 0 && strcmp(remarks, "*") != 0) {
-        strncat(sql, " AND "          , sizeof(sql) - 1);
-        strncat(sql, "Remarks LIKE '%", sizeof(sql) - 1);
-        strncat(sql, remarks          , sizeof(sql) - 1);
-        strncat(sql, "%'"             , sizeof(sql) - 1);
+        ret = snprintf(str, len, " AND Remarks LIKE '%%%s%%'", remarks);
+        str += ret, len -= ret;
     }
-    strncat(sql, ";", sizeof(sql) - 1);
+    ret = snprintf(str, len, " ORDER BY Id DESC;");
+    str += ret, len -= ret;
     printf("sql: %s\n", sql);
     printf("stock list:\n");
     rc = sqlite3_exec(db, sql, callback, cbctx, &err);
@@ -164,36 +164,31 @@ int ffosm_query_record(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int type
     if (!ctx) return -1;
     sqlite3 *db  = ctx;
     char    *err = NULL;
-    char     sql[256];
-    char     tmp[128];
-    int      rc;
+    char     sql[512];
+    char    *str = sql;
+    int      len = sizeof(sql);
+    int      ret, rc;
     callback = callback ? callback : callback_query_stock;
-    strncpy(sql, "SELECT DISTINCT RecordTab.Id, Type, User, ItemId, ItemName, RecordTab.Quantity, datetime(Datetime, 'unixepoch', 'localtime'), RecordTab.Remarks FROM RecordTab JOIN StockTab ON RecordTab.ItemId = StockTab.Id WHERE TRUE", sizeof(sql) - 1);
+    ret = snprintf(str, len, "SELECT DISTINCT RecordTab.Id, Type, User, ItemId, ItemName, RecordTab.Quantity, datetime(Datetime, 'unixepoch', 'localtime'), RecordTab.Remarks FROM RecordTab JOIN StockTab ON RecordTab.ItemId = StockTab.Id WHERE TRUE");
+    str += ret, len -= ret;
     if (type > 0) {
-        snprintf(tmp, sizeof(tmp), "%d", type);
-        strncat(sql, " AND "  , sizeof(sql) - 1);
-        strncat(sql, "Type = ", sizeof(sql) - 1);
-        strncat(sql, tmp      , sizeof(sql) - 1);
+        ret = snprintf(str, len, " AND Type = %d", type);
+        str += ret, len -= ret;
     }
     if (user && strcmp(user, "") != 0 && strcmp(user, "*") != 0) {
-        strncat(sql, " AND "   , sizeof(sql) - 1);
-        strncat(sql, "User = '", sizeof(sql) - 1);
-        strncat(sql, user      , sizeof(sql) - 1);
-        strncat(sql, "'"       , sizeof(sql) - 1);
+        ret = snprintf(str, len, " AND User = '%s'", user);
+        str += ret, len -= ret;
     }
     if (item_id > 0) {
-        snprintf(tmp, sizeof(tmp), "%d", item_id);
-        strncat(sql, " AND "    , sizeof(sql) - 1);
-        strncat(sql, "ItemId = ", sizeof(sql) - 1);
-        strncat(sql, tmp        , sizeof(sql) - 1);
+        ret = snprintf(str, len, " AND ItemId = %d", item_id);
+        str += ret, len -= ret;
     }
     if (remarks && strcmp(remarks, "") != 0 && strcmp(remarks, "*") != 0) {
-        strncat(sql, " AND "          , sizeof(sql) - 1);
-        strncat(sql, "Remarks LIKE '%", sizeof(sql) - 1);
-        strncat(sql, remarks          , sizeof(sql) - 1);
-        strncat(sql, "%'"             , sizeof(sql) - 1);
+        ret = snprintf(str, len, " AND RecordTab.Remarks LIKE '%%%s%%'", remarks);
+        str += ret, len -= ret;
     }
-    strncat(sql, ";", sizeof(sql) - 1);
+    ret = snprintf(str, len, " ORDER BY RecordTab.Id DESC;");
+    str += ret, len -= ret;
     printf("sql: %s\n", sql);
     printf("record list:\n");
     rc = sqlite3_exec(db, sql, callback, cbctx, &err);
