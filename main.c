@@ -15,13 +15,19 @@ static char *s_header1 =
 "Content-Length: %d\r\n\r\n"
 "%s";
 
-#define FFOSM_CGI_PAGE "/ffosm.cgi"
-#define FFOSM_DATABASE "ffosm.db"
+#define FFOSM_MAIN_PAGE  "/ffosm.cgi"
+#define FFOSM_TRANS_PAGE "/transact.cgi"
+#define FFOSM_DATABASE   "ffosm.db"
 
 typedef struct {
     char *buf;
     int   len;
 } CBDATA;
+
+typedef struct {
+    char admin [64];
+    char passwd[64];
+} MAINAPP;
 
 static int query_stock_cb(void *cbctx, int argc, char **argv, char **colname)
 {
@@ -37,11 +43,13 @@ static int query_stock_cb(void *cbctx, int argc, char **argv, char **colname)
 
     ret = snprintf(data->buf, data->len,
         "<td>"
-        "<a href='transact.cgi?act=putin&id=%s'>入库</a>&nbsp;"
-        "<a href='transact.cgi?act=borrow&id=%s'>领用</a>&nbsp;"
-        "<a href='transact.cgi?act=delete&id=%s'>删除</a>"
+        "<a href='%s?act=putin&id=%s'>入库</a>&nbsp;"
+        "<a href='%s?act=borrow&id=%s'>领用</a>&nbsp;"
+        "<a href='%s?act=delete&id=%s'>删除</a>"
         "</td>",
-        argv[0], argv[0], argv[0]);
+        FFOSM_TRANS_PAGE, argv[0],
+        FFOSM_TRANS_PAGE, argv[0],
+        FFOSM_TRANS_PAGE, argv[0]);
     data->buf += ret;
     data->len -= ret;
 
@@ -72,10 +80,11 @@ static int query_record_cb(void *cbctx, int argc, char **argv, char **colname)
         data->len -= ret;
     }
     ret = snprintf(data->buf, data->len, "<td>"
-        "<a href='transact.cgi?act=return&id=%s'>归还</a>&nbsp;"
-        "<a href='transact.cgi?act=scrap&id=%s'>报废</a>"
+        "<a href='%s?act=return&id=%s'>归还</a>&nbsp;"
+        "<a href='%s?act=scrap&id=%s'>报废</a>"
         "</td>",
-        argv[0], argv[0]);
+        FFOSM_TRANS_PAGE, argv[0],
+        FFOSM_TRANS_PAGE, argv[0]);
     data->buf += ret;
     data->len -= ret;
     if (data->len > 0) {
@@ -122,7 +131,7 @@ static int main_page(char *buf, int len)
 
 static int my_ffhttpd_cb(void *cbctx, int id, int cmd, char *path, char *postdata, int postlen, char *respbuf, int resplen)
 {
-    if (strcmp(path, "/index.html") == 0 || strncmp(path, FFOSM_CGI_PAGE, sizeof(FFOSM_CGI_PAGE) - 1) == 0) {
+    if (strcmp(path, "/index.html") == 0 || strncmp(path, FFOSM_MAIN_PAGE, sizeof(FFOSM_MAIN_PAGE) - 1) == 0) {
         char buf[256 * 1024];
         int  len;
         switch (cmd) {
@@ -133,6 +142,16 @@ static int my_ffhttpd_cb(void *cbctx, int id, int cmd, char *path, char *postdat
             snprintf(respbuf, resplen, s_header1, len, buf);
             return 0;
         }
+    }
+    return -1;
+}
+
+static int my_userpasswd_callback(void *cbctx, char *username, char *passwd, int size)
+{
+    // get user password from database
+    if (strcmp(username, "apical") == 0) {
+        strncpy(passwd, "apicalgood", size);
+        return 0;
     }
     return -1;
 }
@@ -152,27 +171,37 @@ static void sig_handler(int sig)
 
 int main(int argc, char *argv[])
 {
-    char *ip   = "0.0.0.0";
-    char *dir  = "www/";
-    int   port = 8080, i;
+    char *ip     = "0.0.0.0";
+    char *dir    = "www/";
+    char *admin  = "apical";
+    char *passwd = "apicalgood";
+    int   port   = 8080, i;
+    MAINAPP app  = {};
 
     for (i = 1; i < argc; i++) {
-        if (strstr(argv[i], "--ip="  ) == argv[i]) ip   = argv[i] + sizeof("--ip=" ) - 1;
-        if (strstr(argv[i], "--dir=" ) == argv[i]) dir  = argv[i] + sizeof("--dir=") - 1;
-        if (strstr(argv[i], "--port=") == argv[i]) port = atoi(argv[i] + sizeof("--port=") - 1);
-        if (strstr(argv[i], "--help" ) == argv[i]) {
+        if (strstr(argv[i], "--ip="    ) == argv[i]) ip     = argv[i] + sizeof("--ip=" ) - 1;
+        if (strstr(argv[i], "--dir="   ) == argv[i]) dir    = argv[i] + sizeof("--dir=") - 1;
+        if (strstr(argv[i], "--port="  ) == argv[i]) port   = atoi(argv[i] + sizeof("--port=") - 1);
+        if (strstr(argv[i], "--admin=" ) == argv[i]) admin  = argv[i] + sizeof("--admin=") - 1;
+        if (strstr(argv[i], "--passwd=") == argv[i]) passwd = argv[i] + sizeof("--passwd=") - 1;
+        if (strstr(argv[i], "--help") == argv[i]) {
             printf("ffhttpd version 1.0.0\n");
             printf("usage: ffhttpd [--ip=server_ip] [--port=server_port] [--dir==root_dir]\n");
             return 0;
         }
     }
-    printf("server ip: %s, port: %d, dir: %s\n", ip, port, dir);
+    printf("server ip: %s, port: %d, dir: %s, admin: %s, passwd: %s\n", ip, port, dir, admin, passwd);
+    strncpy(app.admin , admin , sizeof(app.admin ) - 1);
+    strncpy(app.passwd, passwd, sizeof(app.passwd) - 1);
 
     signal(SIGINT , sig_handler);
     signal(SIGTERM, sig_handler);
     signal(SIGPIPE, sig_handler);
 
-    void *server = ffhttpd_init(ip, port, dir, 0, NULL, my_ffhttpd_cb, NULL);
+    void *server = ffhttpd_init(ip, port, dir, 0, NULL, my_ffhttpd_cb, &app);
+    ffhttpd_set(server, FFHTTPD_PARAM_RESPBUFSIZE, (void*)(64 * 1024));
+    ffhttpd_set(server, FFHTTPD_PARAM_DIGESTAUTH , (void*)FFOSM_TRANS_PAGE);
+    ffhttpd_set(server, FFHTTPD_PARAM_PASSWORDCB , (void*)my_userpasswd_callback);
     while (!s_exit) sleep(1);
     ffhttpd_exit(server);
     return 0;
