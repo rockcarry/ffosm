@@ -49,13 +49,13 @@ static int query_stock_cb(void *cbctx, int argc, char **argv, char **colname)
 
     ret = snprintf(data->buf, data->len,
         "<td>"
-        "<a href='%s?action=putin&id=%s'>入库</a>&nbsp;"
-        "<a href='%s?action=borrow&id=%s'>领用</a>&nbsp;"
-        "<a href='%s?action=delete&id=%s'>删除</a>"
+        "<a href='%s?action=putin&id=I%010d'>入库</a>&nbsp;"
+        "<a href='%s?action=borrow&id=I%010d'>领用</a>&nbsp;"
+        "<a href='%s?action=delete&id=I%010d'>删除</a>"
         "</td>",
-        FFOSM_TRANS_PAGE, argv[0],
-        FFOSM_TRANS_PAGE, argv[0],
-        FFOSM_TRANS_PAGE, argv[0]);
+        FFOSM_TRANS_PAGE, atoi(argv[0]),
+        FFOSM_TRANS_PAGE, atoi(argv[0]),
+        FFOSM_TRANS_PAGE, atoi(argv[0]));
     data->buf += ret;
     data->len -= ret;
 
@@ -89,11 +89,11 @@ static int query_record_cb(void *cbctx, int argc, char **argv, char **colname)
     }
     if (type == OP_BORROW) {
         ret = snprintf(data->buf, data->len, "<td>"
-            "<a href='%s?action=return&id=%s&user=%s&quantity=%s'>归还</a>&nbsp;"
-            "<a href='%s?action=scrap&id=%s&user=%s&quantity=%s'>报废</a>"
+            "<a href='%s?action=return&id=T%010d&user=%s&quantity=%s'>归还</a>&nbsp;"
+            "<a href='%s?action=scrap&id=T%010d&user=%s&quantity=%s'>报废</a>"
             "</td>",
-            FFOSM_TRANS_PAGE, argv[0], argv[2], argv[5],
-            FFOSM_TRANS_PAGE, argv[0], argv[2], argv[5]);
+            FFOSM_TRANS_PAGE, atoi(argv[0]), argv[2], argv[5],
+            FFOSM_TRANS_PAGE, atoi(argv[0]), argv[2], argv[5]);
     } else {
         ret = snprintf(data->buf, data->len, "<td>-</td>");
     }
@@ -177,13 +177,13 @@ static int transact_page(char *buf, int len, char *formdata)
         if (ret == 0) return -1; // redirect to main page
     } else if (strcmp(action, "delete") == 0) {
         void *osm = ffosm_init(FFOSM_DATABASE);
-        ret = ffosm_del_item(osm, atoi(id));
+        ret = ffosm_del_item(osm, atoi(id + 1));
         ffosm_exit(osm);
         if (ret == 0) return -1; // redirect to main page
     } else if (strcmp(action, "putin") == 0) {
         if (strcmp(submit, "1") == 0) {
             void *osm = ffosm_init(FFOSM_DATABASE);
-            int   ret = ffosm_putin(osm, user, atoi(id), atoi(quantity), remarks);
+            int   ret = ffosm_putin(osm, user, atoi(id + 1), atoi(quantity), remarks);
             ffosm_exit(osm);
             if (ret == 0) return -1; // redirect to main page
         } else {
@@ -194,7 +194,7 @@ static int transact_page(char *buf, int len, char *formdata)
     } else if (strcmp(action, "borrow") == 0) {
         if (strcmp(submit, "1") == 0) {
             void *osm = ffosm_init(FFOSM_DATABASE);
-            int   ret = ffosm_borrow(osm, user, atoi(id), atoi(quantity), remarks);
+            int   ret = ffosm_borrow(osm, user, atoi(id + 1), atoi(quantity), remarks);
             ffosm_exit(osm);
             if (ret == 0) return -1; // redirect to main page
         } else {
@@ -205,7 +205,7 @@ static int transact_page(char *buf, int len, char *formdata)
     } else if (strcmp(action, "return") == 0) {
         if (strcmp(submit, "1") == 0) {
             void *osm = ffosm_init(FFOSM_DATABASE);
-            int   ret = ffosm_return(osm, atoi(id), atoi(quantity), remarks);
+            int   ret = ffosm_return(osm, atoi(id + 1), atoi(quantity), remarks);
             ffosm_exit(osm);
             if (ret == 0) return -1; // redirect to main page
         } else {
@@ -216,7 +216,7 @@ static int transact_page(char *buf, int len, char *formdata)
     } else if (strcmp(action, "scrap") == 0) {
         if (strcmp(submit, "1") == 0) {
             void *osm = ffosm_init(FFOSM_DATABASE);
-            int   ret = ffosm_scrap(osm, atoi(id), atoi(quantity), remarks);
+            int   ret = ffosm_scrap(osm, atoi(id + 1), atoi(quantity), remarks);
             ffosm_exit(osm);
             if (ret == 0) return -1; // redirect to main page
         } else {
@@ -314,7 +314,7 @@ int main(int argc, char *argv[])
 
     void *server = ffhttpd_init(ip, port, dir, 0, NULL, my_ffhttpd_cb, &app);
     ffhttpd_set(server, FFHTTPD_PARAM_RESPBUFSIZE, (void*)(64 * 1024));
-    if (strlen(passwd) > 0) {
+    if (0 && strlen(passwd) > 0) {
         ffhttpd_set(server, FFHTTPD_PARAM_DIGESTAUTH , (void*)FFOSM_TRANS_PAGE);
         ffhttpd_set(server, FFHTTPD_PARAM_PASSWORDCB , (void*)my_userpasswd_callback);
     }

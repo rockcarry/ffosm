@@ -203,7 +203,7 @@ int ffosm_query_record(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int type
 
 static int putin_or_borrow(void *ctx, int op, char *user, int itemid, int quantity, char *remarks)
 {
-    if (!ctx || !user || !*user || itemid < 0 || quantity < 0) return -1;
+    if (!ctx || !user || !*user || itemid <= 0 || quantity <= 0) return -1;
     sqlite3 *db  = ctx;
     char    *err = NULL;
     char     sql[512];
@@ -238,7 +238,7 @@ int ffosm_borrow(void *ctx, char *user, int itemid, int quantity, char *remarks)
 
 static int return_or_scrap(void *ctx, int op, int operid, int quantity, char *remarks)
 {
-    if (!ctx || operid < 0 || quantity < 0) return -1;
+    if (!ctx || operid <= 0 || quantity <= 0) return -1;
     sqlite3 *db  = ctx;
     char    *err = NULL;
     char     sql[512];
