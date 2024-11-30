@@ -44,14 +44,14 @@ char* parse_params(char *str, char *key, char *val, int len)
     if (*p == '\0') return NULL;
 
     while (*p) {
-        if (*p != ':' && *p != '"' && *p != '=' && *p != ' ') break;
+        if (*p != '=') break;
         else p++;
     }
 
     for (i = 0; i < len; i++) {
         if (*p == '\\') {
             p++;
-        } else if (*p == '"' || *p == ',' || *p == '&' || *p == '\n' || *p == '\0') {
+        } else if (*p == '&' || *p == '\0') {
             break;
         }
         val[i] = *p++;

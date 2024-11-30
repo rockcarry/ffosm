@@ -8,7 +8,7 @@
   <center><h1>办公物品管理系统</h1></center>
   <hr>
   <h2>%s</h2>
-  <form action="transact.cgi">
+  <form action="transact.cgi" method="post">
    <table>
     <tr><td>%s</td><td>%s</td></tr>
     <tr><td>交易用户：</td><td><input type="text" maxlength="64" name="user" value="%s"/></td></tr>
