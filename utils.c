@@ -29,6 +29,7 @@ char* file_read(char *file, int *size)
         buf[s] = '\0';
     }
     if (size) *size = s;
+    fclose(fp);
     return buf;
 }
 

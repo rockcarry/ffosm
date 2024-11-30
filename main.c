@@ -314,7 +314,7 @@ int main(int argc, char *argv[])
 
     void *server = ffhttpd_init(ip, port, dir, 0, NULL, my_ffhttpd_cb, &app);
     ffhttpd_set(server, FFHTTPD_PARAM_RESPBUFSIZE, (void*)(64 * 1024));
-    if (0 && strlen(passwd) > 0) {
+    if (1 && strlen(passwd) > 0) {
         ffhttpd_set(server, FFHTTPD_PARAM_DIGESTAUTH , (void*)FFOSM_TRANS_PAGE);
         ffhttpd_set(server, FFHTTPD_PARAM_PASSWORDCB , (void*)my_userpasswd_callback);
     }

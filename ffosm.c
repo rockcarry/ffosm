@@ -117,8 +117,7 @@ int ffosm_del_item(void *ctx, int id)
 
 static int callback_query_stock(void *data, int argc, char **argv, char **colname)
 {
-    int  i;
-    for (i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; i++) {
         printf("%s ", argv[i]);
     }
     printf("\n");
@@ -147,7 +146,7 @@ int ffosm_query_stock(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, char *nam
     }
     ret = snprintf(str, len, " ORDER BY Id DESC;");
     str += ret, len -= ret;
-    printf("sql: %s\n", sql);
+//  printf("sql: %s\n", sql);
     printf("stock list:\n");
     rc = sqlite3_exec(db, sql, callback, cbctx, &err);
     if (rc) {
@@ -189,7 +188,7 @@ int ffosm_query_record(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int type
     }
     ret = snprintf(str, len, " ORDER BY RecordTab.Id DESC;");
     str += ret, len -= ret;
-    printf("sql: %s\n", sql);
+//  printf("sql: %s\n", sql);
     printf("record list:\n");
     rc = sqlite3_exec(db, sql, callback, cbctx, &err);
     if (rc) {
