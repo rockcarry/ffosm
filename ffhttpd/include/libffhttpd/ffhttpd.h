@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#define FFHTTPD_VERSION       "v2.3.1" // please also change version in configure.ac
+#define FFHTTPD_VERSION       "v2.3.2" // please also change version in configure.ac
 #define FFHTTPD_MAX_CONN_NUM  8
 
 enum {
