@@ -11,9 +11,9 @@
   <form action="transact.cgi">
    <table>
     <tr><td>%s</td><td>%s</td></tr>
-    <tr><td>交易用户：</td><td><input type="text" name="user" value="%s"/></td></tr>
-    <tr><td>交易数量：</td><td><input type="text" name="quantity" value="%s"/></td></tr>
-    <tr><td>交易备注：</td><td><input type="text" name="remarks"/></td></tr>
+    <tr><td>交易用户：</td><td><input type="text" maxlength="64" name="user" value="%s"/></td></tr>
+    <tr><td>交易数量：</td><td><input type="text" maxlength="32" name="quantity" value="%s"/></td></tr>
+    <tr><td>交易备注：</td><td><input type="text" maxlength="200" name="remarks"/></td></tr>
    </table>
    <br>
    <input type="hidden" name="submit" value="1"/>

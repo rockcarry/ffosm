@@ -18,14 +18,14 @@
   <h2>库存清单</h2>
   <form action="transact.cgi">
    <input type="hidden" name="action" value="create"/>
-   物品名称：<input type="text" name="name"/>&nbsp;
-   物品单价：<input type="text" name="price"/>&nbsp;
-   物品备注：<input type="text" name="remarks"/>&nbsp;
+   物品名称：<input type="text" maxlength="64" name="name"/>&nbsp;
+   物品单价：<input type="text" maxlength="32" name="price"/>&nbsp;
+   物品备注：<input type="text" maxlength="200" name="remarks"/>&nbsp;
    <input type="submit" value="新建">
   </form>
   <form action="ffosm.cgi">
-   物品名称：<input type="text" name="qs_name" value="%s"/>&nbsp;
-   物品备注：<input type="text" name="qs_remarks" value="%s"/>&nbsp;
+   物品名称：<input type="text" maxlength="64" name="qs_name" value="%s"/>&nbsp;
+   物品备注：<input type="text" maxlength="200" name="qs_remarks" value="%s"/>&nbsp;
    <input type="submit" value="查询">
   <table border="1" width=95%%>
    <tr><th>物品编号</th><th>物品名称</th><th>库存</th><th>单价</th><th>物品备注</th><th>操作</th></tr>
@@ -41,9 +41,9 @@
     <option value="4">报废</option>
    </select>
    &nbsp;
-   用户名：<input type="text" name="qt_user" value="%s"/>&nbsp;
-   物品编号：<input type="text" name="qt_id" value="%s"/>&nbsp;
-   交易备注：<input type="text" name="qt_remarks" value="%s"/>&nbsp;
+   用户名：  <input type="text" maxlength="64" name="qt_user" value="%s"/>&nbsp;
+   物品编号：<input type="text" maxlength="32" name="qt_id" value="%s"/>&nbsp;
+   交易备注：<input type="text" maxlength="200" name="qt_remarks" value="%s"/>&nbsp;
    <input type="submit" value="查询">
   <table border="1" width=95%%>
    <tr><th>流水号</th><th>类型</th><th>用户名</th><th>物品编号</th><th>物品名称</th><th>数量</th><th>时间</th><th>交易备注</th><th>操作</th></tr>
