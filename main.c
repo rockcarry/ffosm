@@ -23,6 +23,7 @@ static char *s_header2 =
 #define FFOSM_MAIN_PAGE  "/ffosm.cgi"
 #define FFOSM_TRANS_PAGE "/transact.cgi"
 #define FFOSM_DATABASE   "ffosm.db"
+#define FFOSM_PAGE_SIZE   10
 
 typedef struct {
     char *buf;
@@ -33,6 +34,13 @@ typedef struct {
     char admin [64];
     char passwd[64];
 } MAINAPP;
+
+static char* get_page_param(char *path, char *post, char *key, char *val, int len)
+{
+    if (*post) parse_params(post, key, val, len);
+    if (!*val) parse_params(path, key, val, len);
+    return val;
+}
 
 static int query_inventory_cb(void *cbctx, int argc, char **argv, char **colname)
 {
@@ -131,82 +139,129 @@ static int query_transaction_cb(void *cbctx, int argc, char **argv, char **colna
     return 0;
 }
 
-static int inventory_table(char *buf, int len, char *name, char *remarks)
+static int gen_page_bar(char *buf, int len, int type, int pagenum, int pageidx)
 {
-    void *osm = ffosm_init(FFOSM_DATABASE);
-    CBDATA cbdata = { buf, len };
-    ffosm_query_inventory(osm, query_inventory_cb, &cbdata, name, remarks);
-    ffosm_exit(osm);
+    if (pagenum < 2) return -1;
+    int pagemin, pagemax, ret, i;
+    pageidx = pageidx > 1 ? pageidx : 1;
+    pageidx = pageidx <= pagenum ? pageidx : pagenum;
+    pagemin = pageidx - 10 / 2;
+    pagemin = pagemin > 1 ? pagemin : 1;
+    pagemax = pagemin + 10 / 2;
+    pagemax = pagemax <= pagenum ? pagemax : pagenum;
+    if (len > 0) {
+        ret = snprintf(buf, len, "<tr><td colspan=\"%d\">\n", 100);
+        buf += ret, len -= ret;
+    }
+    if (len > 0 && pageidx - 1 >= 1) {
+        ret = snprintf(buf, len, "<a href=\"javascript:void(0);\" onclick=\"change_page(%d,%d)\" style=\"text-decoration:none;\">&lt;</a>&nbsp;\n", type, pageidx - 1);
+        buf += ret, len -= ret;
+    }
+    for (i = pagemin; i <= pagemax && len > 0; i++) {
+        if (i != pageidx) {
+            ret = snprintf(buf, len, "<a href=\"javascript:void(0);\" onclick=\"change_page(%d,%d)\">%d</a>&nbsp;\n", type, i, i);
+        } else {
+            ret = snprintf(buf, len, "%d&nbsp;\n", i);
+        }
+        buf += ret, len -= ret;
+    }
+    if (len > 0 && pageidx + 1 <= pagenum) {
+        ret = snprintf(buf, len, "<a href=\"javascript:void(0);\" onclick=\"change_page(%d,%d)\" style=\"text-decoration:none;\">&gt;</a>&nbsp;\n", type, pageidx + 1);
+        buf += ret, len -= ret;
+    }
+    if (len > 0) {
+        ret = snprintf(buf, len, "%s", "</td></tr>\n");
+        buf += ret, len -= ret;
+    }
     return 0;
 }
 
-static int borrowed_table(char *buf, int len, char *user, char *name)
+static int inventory_table(char *buf, int len, int page, char *name, char *remarks)
 {
     void *osm = ffosm_init(FFOSM_DATABASE);
     CBDATA cbdata = { buf, len };
-    ffosm_query_borrowed(osm, query_borrowed_cb, &cbdata, user, name);
+    int total = ffosm_query_inventory(osm, NULL, NULL, -1, 0, name, remarks);
+    ffosm_query_inventory(osm, query_inventory_cb, &cbdata, FFOSM_PAGE_SIZE, page, name, remarks);
     ffosm_exit(osm);
+    gen_page_bar(cbdata.buf, cbdata.len, 0, (total + FFOSM_PAGE_SIZE - 1) / FFOSM_PAGE_SIZE, page);
     return 0;
 }
 
-static int transaction_table(char *buf, int len, int type, char *user, char *name, char *remarks)
+static int borrowed_table(char *buf, int len, int page, char *user, char *name)
 {
     void *osm = ffosm_init(FFOSM_DATABASE);
     CBDATA cbdata = { buf, len };
-    ffosm_query_transaction(osm, query_transaction_cb, &cbdata, type, user, name, remarks);
+    int total = ffosm_query_borrowed(osm, NULL, NULL, -1, 0, user, name);
+    ffosm_query_borrowed(osm, query_borrowed_cb, &cbdata, FFOSM_PAGE_SIZE, page, user, name);
     ffosm_exit(osm);
+    gen_page_bar(cbdata.buf, cbdata.len, 1, (total + FFOSM_PAGE_SIZE - 1) / FFOSM_PAGE_SIZE, page);
     return 0;
 }
 
-static int main_page(char *buf, int len, char *path, char *postdata)
+static int transaction_table(char *buf, int len, int page, int type, char *user, char *name, char *remarks)
+{
+    void *osm = ffosm_init(FFOSM_DATABASE);
+    CBDATA cbdata = { buf, len };
+    int total = ffosm_query_transaction(osm, NULL, NULL, -1, 0, type, user, name, remarks);
+    ffosm_query_transaction(osm, query_transaction_cb, &cbdata, FFOSM_PAGE_SIZE, page, type, user, name, remarks);
+    ffosm_exit(osm);
+    gen_page_bar(cbdata.buf, cbdata.len, 2, (total + FFOSM_PAGE_SIZE - 1) / FFOSM_PAGE_SIZE, page);
+    return 0;
+}
+
+static int main_page(char *buf, int len, char *path, char *post)
 {
     char  buf_inventory_table  [64 * 1024];
     char  buf_borrowed_table   [64 * 1024];
     char  buf_transaction_table[64 * 1024];
-    char *formdata = *postdata ? postdata : path;
-    char *page     = file_read("ffosm.p", NULL);
+    char *page = file_read("ffosm.p", NULL);
     if (!page) return snprintf(buf, len, "<html></html>");
 
-    char qs_name[64] = "", qs_remarks[256] = "";
-    parse_params(formdata, "qs_name"   , qs_name   , sizeof(qs_name   ));
-    parse_params(formdata, "qs_remarks", qs_remarks, sizeof(qs_remarks));
-    printf("qs_name: %s, qs_remarks: %s\n", qs_name, qs_remarks);
+    char qs_page[12] = "", qs_name[64] = "", qs_remarks[256] = "";
+    get_page_param(path, post, "qs_page"   , qs_page   , sizeof(qs_page   ));
+    get_page_param(path, post, "qs_name"   , qs_name   , sizeof(qs_name   ));
+    get_page_param(path, post, "qs_remarks", qs_remarks, sizeof(qs_remarks));
+    if (!*qs_page) *qs_page = '1';
+    printf("qs_page: %s, qs_name: %s, qs_remarks: %s\n", qs_page, qs_name, qs_remarks);
 
-    char qb_user[32] = "", qb_name[64] = "";
-    parse_params(formdata, "qb_user", qb_user, sizeof(qb_user));
-    parse_params(formdata, "qb_name", qb_name, sizeof(qb_name));
-    printf("qb_user: %s, qb_name: %s\n", qb_user, qb_name);
+    char qb_page[12] = "", qb_user[32] = "", qb_name[64] = "";
+    get_page_param(path, post, "qb_page", qb_page, sizeof(qb_page));
+    get_page_param(path, post, "qb_user", qb_user, sizeof(qb_user));
+    get_page_param(path, post, "qb_name", qb_name, sizeof(qb_name));
+    if (!*qb_page) *qb_page = '1';
+    printf("qb_page: %s, qb_user: %s, qb_name: %s\n", qb_page, qb_user, qb_name);
 
-    char qt_type[12] = "", qt_user[64] = "", qt_name[64] = "", qt_remarks[256] = "";
-    parse_params(formdata, "qt_type"   , qt_type   , sizeof(qt_type   ));
-    parse_params(formdata, "qt_user"   , qt_user   , sizeof(qt_user   ));
-    parse_params(formdata, "qt_name"   , qt_name   , sizeof(qt_name   ));
-    parse_params(formdata, "qt_remarks", qt_remarks, sizeof(qt_remarks));
-    printf("qt_type: %s, qt_user: %s, qt_name: %s, qt_remarks: %s\n", qt_type, qt_user, qt_name, qt_remarks);
+    char qt_page[12] = "", qt_type[12] = "", qt_user[64] = "", qt_name[64] = "", qt_remarks[256] = "";
+    get_page_param(path, post, "qt_page"   , qt_page   , sizeof(qt_page   ));
+    get_page_param(path, post, "qt_type"   , qt_type   , sizeof(qt_type   ));
+    get_page_param(path, post, "qt_user"   , qt_user   , sizeof(qt_user   ));
+    get_page_param(path, post, "qt_name"   , qt_name   , sizeof(qt_name   ));
+    get_page_param(path, post, "qt_remarks", qt_remarks, sizeof(qt_remarks));
+    if (!*qt_page) *qt_page = '1';
+    printf("qt_page: %s, qt_type: %s, qt_user: %s, qt_name: %s, qt_remarks: %s\n", qt_page, qt_type, qt_user, qt_name, qt_remarks);
 
-    inventory_table  (buf_inventory_table  , sizeof(buf_inventory_table  ), qs_name, qs_remarks);
-    borrowed_table   (buf_borrowed_table   , sizeof(buf_borrowed_table   ), qb_user, qb_name);
-    transaction_table(buf_transaction_table, sizeof(buf_transaction_table), atoi(qt_type), qt_user, qt_name, qt_remarks);
-    int ret = snprintf(buf, len, page, qt_type, qs_name, qs_remarks, buf_inventory_table, qb_user, qb_name, buf_borrowed_table, qt_user, qt_name, qt_remarks, buf_transaction_table);
+    inventory_table  (buf_inventory_table  , sizeof(buf_inventory_table  ), atoi(qs_page), qs_name, qs_remarks);
+    borrowed_table   (buf_borrowed_table   , sizeof(buf_borrowed_table   ), atoi(qb_page), qb_user, qb_name);
+    transaction_table(buf_transaction_table, sizeof(buf_transaction_table), atoi(qt_page), atoi(qt_type), qt_user, qt_name, qt_remarks);
+    int ret = snprintf(buf, len, page, qt_type, qs_page, qs_name, qs_remarks, buf_inventory_table, qb_page, qb_user, qb_name, buf_borrowed_table, qt_page, qt_user, qt_name, qt_remarks, buf_transaction_table);
 
     free(page);
     return ret;
 }
 
-static int transact_page(char *buf, int len, char *path, char *postdata, char *adminpasswd)
+static int transact_page(char *buf, int len, char *path, char *post, char *adminpasswd)
 {
-    char  action[32] = "", name[64] = "", price[32] = "", user[64] = "", quantity[12] = "", remarks[256] = "", id[12] = "", submit[12] = "", formpasswd[64];
-    char *formdata = *postdata ? postdata : path, *page = NULL;
+    char  action[32] = "", name[64] = "", price[32] = "", user[64] = "", quantity[12] = "", remarks[256] = "", id[12] = "", submit[12] = "", formpasswd[64] = "", *page = NULL;
     int   ret = 0;
-    parse_params(formdata, "action"  , action    , sizeof(action    ));
-    parse_params(formdata, "name"    , name      , sizeof(name      ));
-    parse_params(formdata, "price"   , price     , sizeof(price     ));
-    parse_params(formdata, "user"    , user      , sizeof(user      ));
-    parse_params(formdata, "quantity", quantity  , sizeof(quantity  ));
-    parse_params(formdata, "remarks" , remarks   , sizeof(remarks   ));
-    parse_params(formdata, "id"      , id        , sizeof(id        ));
-    parse_params(formdata, "submit"  , submit    , sizeof(submit    ));
-    parse_params(formdata, "passwd"  , formpasswd, sizeof(formpasswd));
+    get_page_param(path, post, "action"  , action    , sizeof(action    ));
+    get_page_param(path, post, "name"    , name      , sizeof(name      ));
+    get_page_param(path, post, "price"   , price     , sizeof(price     ));
+    get_page_param(path, post, "user"    , user      , sizeof(user      ));
+    get_page_param(path, post, "quantity", quantity  , sizeof(quantity  ));
+    get_page_param(path, post, "remarks" , remarks   , sizeof(remarks   ));
+    get_page_param(path, post, "id"      , id        , sizeof(id        ));
+    get_page_param(path, post, "submit"  , submit    , sizeof(submit    ));
+    get_page_param(path, post, "passwd"  , formpasswd, sizeof(formpasswd));
     printf("action: %s, name: %s, price: %s, user: %s, quantity: %s, remarks: %s, id: %s, submit: %s, passwd: %s\n", action, name, price, user, quantity, remarks, id, submit, formpasswd);
 
     if (strcmp(action, "create") == 0) {

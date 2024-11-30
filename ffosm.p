@@ -9,6 +9,14 @@
    window.onload = function() {
     document.getElementById("qt_type").value = "%s";
    }
+   function change_page(type, idx) {
+    switch (type) {
+    case 0: document.getElementById("qs_page").value = idx; break;
+    case 1: document.getElementById("qb_page").value = idx; break;
+    case 2: document.getElementById("qt_page").value = idx; break;
+    }
+    document.getElementById('query').submit();
+   }
   </script>
   <title>ffosm 办公物品管理系统 v1.0.0</title>
  </head>
@@ -29,7 +37,8 @@
    管理密码：<input type="password" maxlength="32" name="passwd"/>&nbsp;
    <input type="submit" value="删除">（执行后将删除指定编号物品的库存和交易记录，危险操作请谨慎执行！）
   </form>
-  <form action="ffosm.cgi" method="post">
+  <form action="ffosm.cgi" method="post" id="query">
+   <input type="hidden" name="qs_page" id="qs_page" value="%s"/>
    物品名称：<input type="text" maxlength="64" name="qs_name" value="%s"/>&nbsp;
    物品备注：<input type="text" maxlength="200" name="qs_remarks" value="%s"/>&nbsp;
    <input type="submit" value="查询">
@@ -38,6 +47,7 @@
     %s
    </table>
    <h2>领用清单</h2>
+   <input type="hidden" name="qb_page" id="qb_page" value="%s"/>
    用户名：  <input type="text" maxlength="32" name="qb_user" value="%s"/>&nbsp;
    物品名称：<input type="text" maxlength="64" name="qb_name" value="%s"/>&nbsp;
    <input type="submit" value="查询">
@@ -46,6 +56,7 @@
     %s
    </table>
    <h2>交易记录</h2>
+   <input type="hidden" name="qt_page" id="qt_page" value="%s"/>
    类型：
    <select name="qt_type" id="qt_type">
     <option value="" >全部</option>

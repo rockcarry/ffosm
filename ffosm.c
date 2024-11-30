@@ -79,7 +79,7 @@ int ffosm_new_item(void *ctx, char *name, float price, char *remarks)
         printf("err: %s\n", err);
         return -1;
     }
-    return 0;
+    return sqlite3_changes(db) > 0 ? 0 : -1;
 }
 
 int ffosm_del_item(void *ctx, int id)
@@ -97,29 +97,34 @@ int ffosm_del_item(void *ctx, int id)
         printf("err: %s\n", err);
         return -1;
     }
-    return 0;
+    return sqlite3_changes(db) > 0 ? 0 : -1;
 }
 
-static int callback_query_stock(void *data, int argc, char **argv, char **colname)
+static int callback_query_quantity(void *data, int argc, char **argv, char **colname)
 {
-    for (int i = 0; i < argc; i++) {
-        printf("%s ", argv[i]);
-    }
-    printf("\n");
+    int *quantity = data;
+    if (quantity) *quantity = atoi(argv[0]);
     return 0;
 }
 
-int ffosm_query_inventory(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, char *name, char *remarks)
+int ffosm_query_inventory(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int pagesize, int pageidx, char *name, char *remarks)
 {
     if (!ctx) return -1;
     sqlite3 *db  = ctx;
     char    *err = NULL;
-    char     sql[512];
+    char     sql[512] = "";
+    char     sel[128] = "id, item_name, total_putin, total_lend, total_scrap, total_stock, price, remarks";
+    char     lmt[128] = "";
     char    *str = sql;
     int      len = sizeof(sql);
-    int      ret, rc;
-    callback = callback ? callback : callback_query_stock;
-    ret = snprintf(str, len, "select id, item_name, total_putin, total_lend, total_scrap, total_stock, price, remarks from tab_inventory where true");
+    int      cnt = 0, ret, rc;
+    if (!callback) {
+        callback = callback_query_quantity;
+        cbctx    = &cnt;
+        snprintf(sel, sizeof(sel), "count(*)");
+    }
+    if (pagesize > 0 && pageidx > 0) snprintf(lmt, sizeof(lmt), "limit %d offset %d", pagesize, (pageidx - 1) * pagesize);
+    ret = snprintf(str, len, "select %s from tab_inventory where 1 = 1", sel);
     str += ret, len -= ret;
     if (name && strcmp(name, "") != 0 && strcmp(name, "*") != 0) {
         ret = snprintf(str, len, " and item_name like '%%%s%%'", name);
@@ -129,7 +134,7 @@ int ffosm_query_inventory(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, char 
         ret = snprintf(str, len, " and remarks like '%%%s%%'", remarks);
         str += ret, len -= ret;
     }
-    ret = snprintf(str, len, " order by id desc;");
+    ret = snprintf(str, len, " order by id desc %s;", lmt);
     str += ret, len -= ret;
 //  printf("sql: %s\n", sql);
     printf("inventory list:\n");
@@ -140,30 +145,37 @@ int ffosm_query_inventory(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, char 
         printf("err: %s\n", err);
         return -1;
     }
-    return 0;
+    return cnt;
 }
 
-int ffosm_query_borrowed(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, char *user, char *name)
+int ffosm_query_borrowed(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int pagesize, int pageidx, char *user, char *name)
 {
     if (!ctx) return -1;
     sqlite3 *db  = ctx;
     char    *err = NULL;
-    char     sql[512];
+    char     sql[512] = "";
+    char     sel[128] = "";
+    char     lmt[128] = "";
     char    *str = sql;
     int      len = sizeof(sql);
-    int      ret, rc;
-    callback = callback ? callback : callback_query_stock;
-    ret = snprintf(str, len, "select distinct user, item_name, item_id, sum(quantity) from tab_transaction join tab_inventory on tab_transaction.item_id = tab_inventory.id where type > 1");
+    int      cnt = 0, ret, rc;
+    if (!callback) {
+        callback = callback_query_quantity;
+        cbctx    = &cnt;
+        snprintf(sel, sizeof(sel), "select count(*) from (");
+    }
+    if (pagesize > 0 && pageidx > 0) snprintf(lmt, sizeof(lmt), "limit %d offset %d", pagesize, (pageidx - 1) * pagesize);
+    ret = snprintf(str, len, "%s select distinct user, item_name, item_id, sum(quantity) from tab_transaction join tab_inventory on tab_transaction.item_id = tab_inventory.id where type > 1", sel);
     str += ret, len -= ret;
     if (user && strcmp(user, "") != 0 && strcmp(user, "*") != 0) {
-        ret = snprintf(str, len, " and user like '%%%s%%'", user);
+        ret = snprintf(str, len, " and user = '%s'", user);
         str += ret, len -= ret;
     }
     if (name && strcmp(name, "") != 0 && strcmp(name, "*") != 0) {
         ret = snprintf(str, len, " and item_name like '%%%s%%'", name);
         str += ret, len -= ret;
     }
-    ret = snprintf(str, len, " group by user, item_id having sum(quantity) > 0;");
+    ret = snprintf(str, len, " group by user, item_id having sum(quantity) > 0 %s %s;", lmt, callback == callback_query_quantity ? ")" : "");
     str += ret, len -= ret;
 //  printf("sql: %s\n", sql);
     printf("transaction list:\n");
@@ -174,20 +186,27 @@ int ffosm_query_borrowed(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, char *
         printf("err: %s\n", err);
         return -1;
     }
-    return 0;
+    return cnt;
 }
 
-int ffosm_query_transaction(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int type, char *user, char *name, char *remarks)
+int ffosm_query_transaction(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int pagesize, int pageidx, int type, char *user, char *name, char *remarks)
 {
     if (!ctx) return -1;
     sqlite3 *db  = ctx;
     char    *err = NULL;
-    char     sql[512];
+    char     sql[512] = "";
+    char     sel[256] = "tab_transaction.id, type, user, item_id, item_name, quantity, datetime(datetime, 'unixepoch', 'localtime'), tab_transaction.remarks";
+    char     lmt[128] = "";
     char    *str = sql;
     int      len = sizeof(sql);
-    int      ret, rc;
-    callback = callback ? callback : callback_query_stock;
-    ret = snprintf(str, len, "select distinct tab_transaction.id, type, user, item_id, item_name, quantity, datetime(datetime, 'unixepoch', 'localtime'), tab_transaction.remarks from tab_transaction join tab_inventory ON tab_transaction.item_id = tab_inventory.id where true");
+    int      cnt = 0, ret, rc;
+    if (!callback) {
+        callback = callback_query_quantity;
+        cbctx    = &cnt;
+        snprintf(sel, sizeof(sel), "count(*)");
+    }
+    if (pagesize > 0 && pageidx > 0) snprintf(lmt, sizeof(lmt), "limit %d offset %d", pagesize, (pageidx - 1) * pagesize);
+    ret = snprintf(str, len, "select distinct %s from tab_transaction join tab_inventory on tab_transaction.item_id = tab_inventory.id where 1 = 1", sel);
     str += ret, len -= ret;
     if (type > 0) {
         ret = snprintf(str, len, " and type = %d", type);
@@ -205,7 +224,7 @@ int ffosm_query_transaction(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int
         ret = snprintf(str, len, " and tab_transaction.remarks like '%%%s%%'", remarks);
         str += ret, len -= ret;
     }
-    ret = snprintf(str, len, " order by tab_transaction.id desc;");
+    ret = snprintf(str, len, " order by tab_transaction.id desc %s;", lmt);
     str += ret, len -= ret;
 //  printf("sql: %s\n", sql);
     printf("transaction list:\n");
@@ -216,7 +235,7 @@ int ffosm_query_transaction(void *ctx, FFOSM_QUERY_CB callback, void *cbctx, int
         printf("err: %s\n", err);
         return -1;
     }
-    return 0;
+    return cnt;
 }
 
 static int putin_or_lend(void *ctx, int op, char *user, int itemid, int quantity, char *remarks)
@@ -246,7 +265,7 @@ static int putin_or_lend(void *ctx, int op, char *user, int itemid, int quantity
         printf("err: %s\n", err);
         return -1;
     }
-    return 0;
+    return sqlite3_changes(db) > 0 ? 0 : -1;
 }
 
 int ffosm_putin(void *ctx, char *user, int itemid, int quantity, char *remarks)
@@ -257,13 +276,6 @@ int ffosm_putin(void *ctx, char *user, int itemid, int quantity, char *remarks)
 int ffosm_lend(void *ctx, char *user, int itemid, int quantity, char *remarks)
 {
     return putin_or_lend(ctx, OP_LEND, user, itemid, quantity, remarks);
-}
-
-static int callback_query_quantity(void *data, int argc, char **argv, char **colname)
-{
-    int *quantity = data;
-    if (quantity) *quantity = atoi(argv[0]);
-    return 0;
 }
 
 static int return_or_scrap(void *ctx, int op, char *user, int itemid, int quantity, char *remarks)
@@ -305,7 +317,7 @@ static int return_or_scrap(void *ctx, int op, char *user, int itemid, int quanti
         printf("err: %s\n", err);
         return -1;
     }
-    return 0;
+    return sqlite3_changes(db) > 0 ? 0 : -1;
 }
 
 int ffosm_return(void *ctx, char *user, int itemid, int quantity, char *remarks)
@@ -319,6 +331,15 @@ int ffosm_scrap(void *ctx, char *user, int itemid, int quantity, char *remarks)
 }
 
 #ifdef _TEST_
+static int callback_query_test(void *data, int argc, char **argv, char **colname)
+{
+    for (int i = 0; i < argc; i++) {
+        printf("%s ", argv[i]);
+    }
+    printf("\n");
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     char *file = "ffosm.db";
@@ -340,16 +361,21 @@ int main(int argc, char *argv[])
             scanf("%d", &id);
             ret = ffosm_del_item(osm, id);
             printf("del item, ret: %d\n", ret);
-        } else if (strcmp(cmd, "query_stock" ) == 0) {
+        } else if (strcmp(cmd, "query_inventory") == 0) {
             char name[65] = "", remarks[256] = "";
             scanf("%64s %255s", name, remarks);
-            ret = ffosm_query_inventory(osm, NULL, NULL, name, remarks);
-            printf("query stock, ret: %d\n", ret);
-        } else if (strcmp(cmd, "query_record" ) == 0) {
+            ret = ffosm_query_inventory(osm, callback_query_test, NULL, -1, 0, name, remarks);
+            printf("query inventory, ret: %d\n", ret);
+        } else if (strcmp(cmd, "query_borrowed") == 0) {
+            char user[33] = "", name[65] = "";
+            scanf("%32s %64s", user, name);
+            ret = ffosm_query_borrowed(osm, callback_query_test, NULL, -1, 0, user, name);
+            printf("query borrowed, ret: %d\n", ret);
+        } else if (strcmp(cmd, "query_transaction") == 0) {
             int type = -1; char user[33] = "", name[65] = "", remarks[256] = "";
             scanf("%d %32s %64s %255s", &type, user, name, remarks);
-            ret = ffosm_query_transaction(osm, NULL, NULL, type, user, name, remarks);
-            printf("query record, ret: %d\n", ret);
+            ret = ffosm_query_transaction(osm, callback_query_test, NULL, -1, 0, type, user, name, remarks);
+            printf("query transaction, ret: %d\n", ret);
         } else if (strcmp(cmd, "putin") == 0) {
             char user[33] = "", remarks[256] = ""; int itemid = -1, quantity = -1;
             scanf("%32s %d %d %255s", user, &itemid, &quantity, remarks);
